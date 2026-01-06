@@ -2,17 +2,30 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
+import { UploadVideoDto } from './upload.dto';
 
 @Injectable()
 export class UploadService {
   constructor(private configService: ConfigService) {}
 
-  handleUpload(file: Express.Multer.File) {
+  handleUpload(file: Express.Multer.File, uploadDto: UploadVideoDto) {
     try {
-      // 确保上传目录存在
+      // 确保上传根目录存在
       const uploadDir = path.join(process.cwd(), 'uploads');
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
+      }
+
+      // 创建一级目录：recordId
+      const recordDir = path.join(uploadDir, uploadDto.learnRecordId);
+      if (!fs.existsSync(recordDir)) {
+        fs.mkdirSync(recordDir, { recursive: true });
+      }
+
+      // 创建二级目录：taskId
+      const taskDir = path.join(recordDir, String(uploadDto.sectionTaskId));
+      if (!fs.existsSync(taskDir)) {
+        fs.mkdirSync(taskDir, { recursive: true });
       }
 
       // 处理中文文件名乱码：从 latin1 转换为 utf8
@@ -20,17 +33,23 @@ export class UploadService {
         'utf8',
       );
 
-      // 生成文件名
-      const fileName = `${Date.now()}-${decodedFileName}`;
-      const filePath = path.join(uploadDir, fileName);
+      // 获取文件扩展名
+      const ext = path.extname(decodedFileName);
+
+      // 生成文件名：taskSpeakerIndex_speakerRole_sliceIndex_sliceTotal
+      const fileName = `${uploadDto.taskSpeakerIndex}_${uploadDto.speakerRole}_${uploadDto.sliceIndex}_${uploadDto.sliceTotal}${ext}`;
+      const filePath = path.join(taskDir, fileName);
 
       // 保存文件
       fs.writeFileSync(filePath, file.buffer);
 
       return {
-        code: 100200,
+        code: 0,
         data: {
-          fileUrl: 'https://p.gsxcdn.com/3297217710_w9ns3jjx.xlsx',
+          success: true,
+          fileUrl: filePath,
+          fileName: fileName,
+          filePath: filePath,
         },
         msg: '文件上传成功',
       };
